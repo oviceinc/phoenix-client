@@ -1,5 +1,5 @@
 import {
-  global,
+  globalValue,
   phxWindow,
   CHANNEL_EVENTS,
   DEFAULT_TIMEOUT,
@@ -115,11 +115,11 @@ export default class Socket {
     this.sendBuffer = []
     this.ref = 0
     this.timeout = opts.timeout || DEFAULT_TIMEOUT
-    this.transport = opts.transport || global.WebSocket || LongPoll
+    this.transport = opts.transport || globalValue.WebSocket || LongPoll
     this.primaryPassedHealthCheck = false
     this.longPollFallbackMs = opts.longPollFallbackMs
     this.fallbackTimer = null
-    this.sessionStore = opts.sessionStorage || (global && global.sessionStorage)
+    this.sessionStore = opts.sessionStorage || (globalValue && globalValue.sessionStorage)
     this.establishedConnections = 0
     this.defaultEncoder = Serializer.encode.bind(Serializer)
     this.defaultDecoder = Serializer.decode.bind(Serializer)

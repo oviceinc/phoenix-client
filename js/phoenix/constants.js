@@ -5,6 +5,7 @@ export const DEFAULT_VSN = "2.0.0"
 export const SOCKET_STATES = {connecting: 0, open: 1, closing: 2, closed: 3}
 export const DEFAULT_TIMEOUT = 10000
 export const WS_CLOSE_NORMAL = 1000
+export const WS_CLOSE_HEARTBEAT_TIMEOUT = 3000
 export const CHANNEL_STATES = {
   closed: "closed",
   errored: "errored",

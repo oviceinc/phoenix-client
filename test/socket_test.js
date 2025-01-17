@@ -583,13 +583,6 @@ describe("with transports", function (){
       socket.connect()
     })
 
-    it("does not schedule reconnectTimer if normal close", function (){
-      const scheduleSpy = jest.spyOn(socket.reconnectTimer, "scheduleTimeout")
-      const event = {code: 1000}
-      socket.onConnClose(event)
-      expect(scheduleSpy).not.toHaveBeenCalled()
-    })
-
     it("schedules reconnectTimer timeout if abnormal close", function (){
       const scheduleSpy = jest.spyOn(socket.reconnectTimer, "scheduleTimeout")
       const event = {code: 1006}

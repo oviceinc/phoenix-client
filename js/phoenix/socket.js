@@ -6,7 +6,7 @@ import {
   DEFAULT_VSN,
   SOCKET_STATES,
   TRANSPORTS,
-  WS_CLOSE_NORMAL
+  WS_CLOSE_HEARTBEAT_TIMEOUT,
 } from "./constants"
 
 import {
@@ -427,7 +427,7 @@ export default class Socket {
       if(this.hasLogger()){ this.log("transport", "heartbeat timeout. Attempting to re-establish connection") }
       this.triggerChanError()
       this.closeWasClean = false
-      this.teardown(() => this.reconnectTimer.scheduleTimeout(), WS_CLOSE_NORMAL, "heartbeat timeout")
+      this.teardown(() => this.reconnectTimer.scheduleTimeout(), WS_CLOSE_HEARTBEAT_TIMEOUT, "heartbeat timeout")
     }
   }
 
@@ -489,7 +489,7 @@ export default class Socket {
     if(this.hasLogger()) this.log("transport", "close", event)
     this.triggerChanError()
     this.clearHeartbeats()
-    if(!this.closeWasClean && closeCode !== 1000){
+    if(!this.closeWasClean && closeCode !== WS_CLOSE_HEARTBEAT_TIMEOUT){
       this.reconnectTimer.scheduleTimeout()
     }
     this.stateChangeCallbacks.close.forEach(([, callback]) => callback(event))

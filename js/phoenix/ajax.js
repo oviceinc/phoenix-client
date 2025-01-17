@@ -1,16 +1,16 @@
 import {
-  global,
+  globalValue,
   XHR_STATES
 } from "./constants"
 
 export default class Ajax {
 
   static request(method, endPoint, accept, body, timeout, ontimeout, callback){
-    if(global.XDomainRequest){
-      let req = new global.XDomainRequest() // IE8, IE9
+    if(globalValue.XDomainRequest){
+      let req = new globalValue.XDomainRequest() // IE8, IE9
       return this.xdomainRequest(req, method, endPoint, body, timeout, ontimeout, callback)
     } else {
-      let req = new global.XMLHttpRequest() // IE7+, Firefox, Chrome, Opera, Safari
+      let req = new globalValue.XMLHttpRequest() // IE7+, Firefox, Chrome, Opera, Safari
       return this.xhrRequest(req, method, endPoint, accept, body, timeout, ontimeout, callback)
     }
   }

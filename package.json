@@ -11,7 +11,7 @@
   },
   "exports": {
     ".": "./js/phoenix/index.js",
-    "./": "./js/phoenix/"
+    "./*": "./js/phoenix/*.js"
   },
   "author": "Chris McCord <chris@chrismccord.com> (https://www.phoenixframework.org)",
   "devDependencies": {

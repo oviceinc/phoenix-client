@@ -3,14 +3,18 @@
   "version": "1.7.14",
   "description": "The official JavaScript client for the Phoenix web framework.",
   "license": "MIT",
-  "main": "./assets/js/phoenix/index.js",
-  "module": "./assets/js/phoenix/index.js",
+  "main": "./js/phoenix/index.js",
+  "module": "./js/phoenix/index.js",
+  "types": "./js/phoenix/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git://github.com/phoenixframework/phoenix.git"
   },
   "exports": {
-    ".": "./js/phoenix/index.js",
+    ".": {
+      "import": "./js/phoenix/index.js",
+      "types": "./js/phoenix/index.d.ts"
+    },
     "./*": "./js/phoenix/*.js"
   },
   "author": "Chris McCord <chris@chrismccord.com> (https://www.phoenixframework.org)",

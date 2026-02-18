@@ -176,6 +176,7 @@ export default class Socket {
     this.heartbeatTimer = null
     this.pendingHeartbeatRef = null
     this.reconnectTimer = new Timer(() => {
+      this.closeWasClean = true
       this.teardown(() => this.connect())
     }, this.reconnectAfterMs)
   }

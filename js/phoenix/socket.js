@@ -444,13 +444,14 @@ export default class Socket {
       return callback && callback()
     }
 
+    const connToTearDown = this.conn
     this.waitForBufferDone(() => {
-      if(this.conn){
+      if(this.conn === connToTearDown){
         if(code){ this.conn.close(code, reason || "") } else { this.conn.close() }
       }
 
-      this.waitForSocketClosed(() => {
-        if(this.conn){
+      this.waitForSocketClosed(connToTearDown, () => {
+        if(this.conn === connToTearDown){
           this.conn.onopen = function (){ } // noop
           this.conn.onerror = function (){ } // noop
           this.conn.onmessage = function (){ } // noop
@@ -474,14 +475,14 @@ export default class Socket {
     }, 150 * tries)
   }
 
-  waitForSocketClosed(callback, tries = 1){
-    if(tries === 5 || !this.conn || this.conn.readyState === SOCKET_STATES.closed){
+  waitForSocketClosed(conn, callback, tries = 1){
+    if(tries === 5 || !conn || conn.readyState === SOCKET_STATES.closed){
       callback()
       return
     }
 
     setTimeout(() => {
-      this.waitForSocketClosed(callback, tries + 1)
+      this.waitForSocketClosed(conn, callback, tries + 1)
     }, 150 * tries)
   }
 

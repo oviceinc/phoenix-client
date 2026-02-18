@@ -1,7 +1,6 @@
 import {
   SOCKET_STATES,
-  TRANSPORTS,
-  AUTH_TOKEN_PREFIX
+  TRANSPORTS
 } from "./constants"
 
 import Ajax from "./ajax"
@@ -16,12 +15,7 @@ let arrayBufferToBase64 = (buffer) => {
 
 export default class LongPoll {
 
-  constructor(endPoint, protocols){
-    // we only support subprotocols for authToken
-    // ["phoenix", "base64url.bearer.phx.BASE64_ENCODED_TOKEN"]
-    if(protocols && protocols.length === 2 && protocols[1].startsWith(AUTH_TOKEN_PREFIX)){
-      this.authToken = atob(protocols[1].slice(AUTH_TOKEN_PREFIX.length))
-    }
+  constructor(endPoint){
     this.endPoint = null
     this.token = null
     this.skipHeartbeat = true
@@ -64,20 +58,9 @@ export default class LongPoll {
   isActive(){ return this.readyState === SOCKET_STATES.open || this.readyState === SOCKET_STATES.connecting }
 
   poll(){
-    const headers = {"Accept": "application/json"}
-    if(this.authToken){
-      headers["X-Phoenix-AuthToken"] = this.authToken
-    }
-    this.ajax("GET", headers, null, () => this.ontimeout(), resp => {
+    this.ajax("GET", "application/json", null, () => this.ontimeout(), resp => {
       if(resp){
         var {status, token, messages} = resp
-        if(status === 410 && this.token !== null){
-          // In case we already have a token, this means that our existing session
-          // is gone. We fail so that the client rejoins its channels.
-          this.onerror(410)
-          this.closeAndRetry(3410, "session_gone", false)
-          return
-        }
         this.token = token
       } else {
         status = 0
@@ -151,7 +134,7 @@ export default class LongPoll {
 
   batchSend(messages){
     this.awaitingBatchAck = true
-    this.ajax("POST", {"Content-Type": "application/x-ndjson"}, messages.join("\n"), () => this.onerror("timeout"), resp => {
+    this.ajax("POST", "application/x-ndjson", messages.join("\n"), () => this.onerror("timeout"), resp => {
       this.awaitingBatchAck = false
       if(!resp || resp.status !== 200){
         this.onerror(resp && resp.status)
@@ -177,13 +160,13 @@ export default class LongPoll {
     }
   }
 
-  ajax(method, headers, body, onCallerTimeout, callback){
+  ajax(method, contentType, body, onCallerTimeout, callback){
     let req
     let ontimeout = () => {
       this.reqs.delete(req)
       onCallerTimeout()
     }
-    req = Ajax.request(method, this.endpointURL(), headers, body, this.timeout, ontimeout, resp => {
+    req = Ajax.request(method, this.endpointURL(), contentType, body, this.timeout, ontimeout, resp => {
       this.reqs.delete(req)
       if(this.isActive()){ callback(resp) }
     })

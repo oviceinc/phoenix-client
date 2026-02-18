@@ -39,7 +39,6 @@ export interface SocketConnectOption {
     transport: new(endpoint: string) => object;
     timeout: number;
     heartbeatIntervalMs: number;
-    heartbeatTimeoutMs: number;
     longPollFallbackMs: number;
     longpollerTimeout: number;
     encode: (payload: object, callback: (encoded: any) => void | Promise<void>) => void;
@@ -50,7 +49,6 @@ export interface SocketConnectOption {
     vsn: string;
     debug: boolean;
     sessionStorage: object;
-    authToken: string;
 }
 
 export type MessageRef = string;
@@ -92,7 +90,7 @@ export class Socket {
 }
 
 export class LongPoll {
-    constructor(endPoint: string, protocols?: string[]);
+    constructor(endPoint: string);
 
     normalizeEndpoint(endPoint: string): string;
     endpointURL(): string;
@@ -113,22 +111,12 @@ export class Ajax {
     static request(
         method: string,
         endPoint: string,
-        headers: Record<string, string>,
+        accept: string,
         body: any,
         timeout?: number,
         ontimeout?: any,
         callback?: (response?: any) => void | Promise<void>,
     ): void;
-
-    static fetchRequest(
-        method: string,
-        endPoint: string,
-        headers: Record<string, string>,
-        body: any,
-        timeout?: number,
-        ontimeout?: any,
-        callback?: (response?: any) => void | Promise<void>,
-    ): AbortController | null;
 
     static xdomainRequest(
         req: any,
@@ -144,7 +132,7 @@ export class Ajax {
         req: any,
         method: string,
         endPoint: string,
-        headers: Record<string, string>,
+        accept: string,
         body: any,
         timeout?: number,
         ontimeout?: any,

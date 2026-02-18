@@ -1,14 +1,12 @@
 import {
-  global,
+  globalValue,
   phxWindow,
   CHANNEL_EVENTS,
   DEFAULT_TIMEOUT,
   DEFAULT_VSN,
   SOCKET_STATES,
   TRANSPORTS,
-  WS_CLOSE_NORMAL,
   WS_CLOSE_HEARTBEAT_TIMEOUT,
-  AUTH_TOKEN_PREFIX
 } from "./constants"
 
 import {
@@ -56,7 +54,7 @@ import Timer from "./timer"
  * Defaults `DEFAULT_TIMEOUT`
  * @param {number} [opts.heartbeatIntervalMs] - The millisec interval to send a heartbeat message
  * @param {number} [opts.heartbeatTimeoutMs] - The default timeout in milliseconds to trigger heartbeat timeouts
- * @param {Function} [opts.reconnectAfterMs]- The optional function that returns the
+ * @param {Function} [opts.reconnectAfterMs] - The optional function that returns the
  * socket reconnect interval, in milliseconds.
  *
  * Defaults to stepped backoff of:
@@ -89,8 +87,6 @@ import Timer from "./timer"
  * Defaults to 20s (double the server long poll timer).
  *
  * @param {(Object|function)} [opts.params] - The optional params to pass when connecting
- * @param {string} [opts.authToken] - the optional authentication token to be exposed on the server
- * under the `:auth_token` connect_info key.
  * @param {string} [opts.binaryType] - The binary type to use for binary WebSocket frames.
  *
  * Defaults to "arraybuffer"
@@ -118,21 +114,18 @@ export default class Socket {
     this.channels = []
     this.sendBuffer = []
     this.ref = 0
-    this.fallbackRef = null
     this.timeout = opts.timeout || DEFAULT_TIMEOUT
-    this.transport = opts.transport || global.WebSocket || LongPoll
+    this.transport = opts.transport || globalValue.WebSocket || LongPoll
     this.primaryPassedHealthCheck = false
     this.longPollFallbackMs = opts.longPollFallbackMs
     this.fallbackTimer = null
-    this.sessionStore = opts.sessionStorage || (global && global.sessionStorage)
+    this.sessionStore = opts.sessionStorage || (globalValue && globalValue.sessionStorage)
     this.establishedConnections = 0
     this.defaultEncoder = Serializer.encode.bind(Serializer)
     this.defaultDecoder = Serializer.decode.bind(Serializer)
     this.closeWasClean = false
-    this.disconnecting = false
     this.binaryType = opts.binaryType || "arraybuffer"
     this.connectClock = 1
-    this.pageHidden = false
     if(this.transport !== LongPoll){
       this.encode = opts.encode || this.defaultEncoder
       this.decode = opts.decode || this.defaultDecoder
@@ -154,21 +147,10 @@ export default class Socket {
           this.connect()
         }
       })
-      phxWindow.addEventListener("visibilitychange", () => {
-        if(document.visibilityState === "hidden"){
-          this.pageHidden = true
-        } else {
-          this.pageHidden = false
-          // reconnect immediately
-          if(!this.isConnected() && !this.closeWasClean){
-            this.teardown(() => this.connect())
-          }
-        }
-      })
     }
     this.heartbeatIntervalMs = opts.heartbeatIntervalMs || 30000
     this.heartbeatTimeoutMs = opts.heartbeatTimeoutMs || this.heartbeatIntervalMs
-    this.rejoinAfterMs= (tries) => {
+    this.rejoinAfterMs = (tries) => {
       if(opts.rejoinAfterMs){
         return opts.rejoinAfterMs(tries)
       } else {
@@ -194,15 +176,9 @@ export default class Socket {
     this.heartbeatTimer = null
     this.pendingHeartbeatRef = null
     this.reconnectTimer = new Timer(() => {
-      if(this.pageHidden){
-        this.log("Not reconnecting as page is hidden!")
-        this.teardown()
-        return
-      }
       this.closeWasClean = true
       this.teardown(() => this.connect())
     }, this.reconnectAfterMs)
-    this.authToken = opts.authToken
   }
 
   /**
@@ -260,14 +236,10 @@ export default class Socket {
    */
   disconnect(callback, code, reason){
     this.connectClock++
-    this.disconnecting = true
     this.closeWasClean = true
     clearTimeout(this.fallbackTimer)
     this.reconnectTimer.reset()
-    this.teardown(() => {
-      this.disconnecting = false
-      callback && callback()
-    }, code, reason)
+    this.teardown(callback, code, reason)
   }
 
   /**
@@ -282,7 +254,7 @@ export default class Socket {
       console && console.log("passing params to connect is deprecated. Instead pass :params to the Socket constructor")
       this.params = closure(params)
     }
-    if(this.conn && !this.disconnecting){ return }
+    if(this.conn){ return }
     if(this.longPollFallbackMs && this.transport !== LongPoll){
       this.connectWithFallback(LongPoll, this.longPollFallbackMs)
     } else {
@@ -371,35 +343,12 @@ export default class Socket {
 
   /**
    * @private
-   *
-   * @param {Function}
    */
-  transportName(transport){
-    // JavaScript minification, enabled by default in production in Phoenix
-    // projects, renames symbols to reduce code size.
-    // See https://esbuild.github.io/api/#keep-names.
-    // This helper ensures we return the correct name for the LongPoll transport
-    // even after minification. The other common transport is WebSocket, which
-    // is native to browsers and does not need special handling.
-    switch(transport){
-      case LongPoll: return "LongPoll"
-      default: return transport.name
-    }
-  }
 
-  /**
-   * @private
-   */
   transportConnect(){
     this.connectClock++
     this.closeWasClean = false
-    let protocols = undefined
-    // Sec-WebSocket-Protocol based token
-    // (longpoll uses Authorization header instead)
-    if(this.authToken){
-      protocols = ["phoenix", `${AUTH_TOKEN_PREFIX}${btoa(this.authToken).replace(/=/g, "")}`]
-    }
-    this.conn = new this.transport(this.endPointURL(), protocols)
+    this.conn = new this.transport(this.endPointURL())
     this.conn.binaryType = this.binaryType
     this.conn.timeout = this.longpollerTimeout
     this.conn.onopen = () => this.onConnOpen()
@@ -417,15 +366,14 @@ export default class Socket {
     let established = false
     let primaryTransport = true
     let openRef, errorRef
-    let fallbackTransportName = this.transportName(fallbackTransport)
     let fallback = (reason) => {
-      this.log("transport", `falling back to ${fallbackTransportName}...`, reason)
+      this.log("transport", `falling back to ${fallbackTransport.name}...`, reason)
       this.off([openRef, errorRef])
       primaryTransport = false
       this.replaceTransport(fallbackTransport)
       this.transportConnect()
     }
-    if(this.getSession(`phx:fallback:${fallbackTransportName}`)){ return fallback("memorized") }
+    if(this.getSession(`phx:fallback:${fallbackTransport.name}`)){ return fallback("memorized") }
 
     this.fallbackTimer = setTimeout(fallback, fallbackThreshold)
 
@@ -436,16 +384,12 @@ export default class Socket {
         fallback(reason)
       }
     })
-    if(this.fallbackRef){
-      this.off([this.fallbackRef])
-    }
-    this.fallbackRef = this.onOpen(() => {
+    this.onOpen(() => {
       established = true
       if(!primaryTransport){
-        let fallbackTransportName = this.transportName(fallbackTransport)
         // only memorize LP if we never connected to primary
-        if(!this.primaryPassedHealthCheck){ this.storeSession(`phx:fallback:${fallbackTransportName}`, "true") }
-        return this.log("transport", `established ${fallbackTransportName} fallback`)
+        if(!this.primaryPassedHealthCheck){ this.storeSession(`phx:fallback:${fallbackTransport.name}`, "true") }
+        return this.log("transport", `established ${fallbackTransport.name} fallback`)
       }
       // if we've established primary, give the fallback a new period to attempt ping
       clearTimeout(this.fallbackTimer)
@@ -465,9 +409,8 @@ export default class Socket {
   }
 
   onConnOpen(){
-    if(this.hasLogger()) this.log("transport", `${this.transportName(this.transport)} connected to ${this.endPointURL()}`)
+    if(this.hasLogger()) this.log("transport", `${this.transport.name} connected to ${this.endPointURL()}`)
     this.closeWasClean = false
-    this.disconnecting = false
     this.establishedConnections++
     this.flushSendBuffer()
     this.reconnectTimer.reset()
@@ -500,16 +443,13 @@ export default class Socket {
     if(!this.conn){
       return callback && callback()
     }
-    let connectClock = this.connectClock
 
     this.waitForBufferDone(() => {
-      if(connectClock !== this.connectClock){ return }
       if(this.conn){
         if(code){ this.conn.close(code, reason || "") } else { this.conn.close() }
       }
 
       this.waitForSocketClosed(() => {
-        if(connectClock !== this.connectClock){ return }
         if(this.conn){
           this.conn.onopen = function (){ } // noop
           this.conn.onerror = function (){ } // noop
@@ -546,7 +486,6 @@ export default class Socket {
   }
 
   onConnClose(event){
-    if(this.conn) this.conn.onclose = () => {} // noop to prevent recursive calls in teardown
     let closeCode = event && event.code
     if(this.hasLogger()) this.log("transport", "close", event)
     this.triggerChanError()
